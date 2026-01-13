@@ -28,12 +28,24 @@ def save_memory(data):
         json.dump(data, f, indent=4)
 
 def get_sector_intel():
+    """Optimized Tri-Layer Recon for precise Location/Weather."""
+    # Layer 1: High-Accuracy Recon (wttr) - Precise City/Weather
     try:
-        res = requests.get("https://wttr.in/?format=%l:+%C+%t", timeout=3)
+        # We use a 2-second timeout to prevent the UI from hanging
+        res = requests.get("https://wttr.in/?format=%l:+%C+%t", timeout=2)
         if res.status_code == 200 and "Unknown" not in res.text:
             return f"SECTOR: {res.text.strip()}"
     except: pass
-    return "SECTOR: ENCRYPTED | ATMO: STABLE"
+    
+    # Layer 2: Regional Backup (ipapi) - City/State via IP
+    try:
+        res = requests.get("https://ipapi.co/json/", timeout=2).json()
+        if res.get('city'):
+            return f"SECTOR: {res['city']}, {res.get('region_code', 'LOC')} | ATMO: STABLE"
+    except: pass
+
+    # Layer 3: Broad-Sector Fallback - Prevents "Incomplete Data" error
+    return "SECTOR: GLOBAL_WIDE | ENCRYPTION: ACTIVE"
 
 def get_base64_bin(file_path):
     if os.path.exists(file_path):
