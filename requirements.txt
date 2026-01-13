@@ -1,7 +1,6 @@
 streamlit
+groq
 opencv-python-headless
 numpy
 requests
-SpeechRecognition
-PyAudio
-Pillow
+speechrecognition

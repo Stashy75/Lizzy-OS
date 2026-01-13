@@ -63,13 +63,18 @@ def trigger_haptic():
     components.html("<script>window.navigator.vibrate([100, 30, 100]);</script>", height=0)
 
 def lizzy_speak(text):
-    text = re.sub(r"(?i)as an ai.*?,|(?i)I am an ai.*?,|(?i)legal guidelines", "", text)
-    rate = 160 
-    if st.session_state.get('temperament') == "AFFECTIONATE": rate = 145
-    text = text.replace("...", " [[slnc 500]] ")
-    clean_text = text.replace('"', '').replace("'", "").replace("\n", " ")
-    os.system("killall say 2>/dev/null") 
-    subprocess.Popen(['say', '-v', 'Noelle', f'[[rate {rate}]]', clean_text])
+    """Universal Voice: Commands the browser (Phone or PC) to speak."""
+    clean_text = re.sub(r"(?i)as an ai.*?,|(?i)I am an ai.*?,", "", text)
+    clean_text = clean_text.replace("'", "").replace('"', '').replace("\n", " ")
+    
+    components.html(f"""
+        <script>
+        var msg = new SpeechSynthesisUtterance('{clean_text}');
+        msg.rate = 1.1;
+        msg.pitch = 0.9;
+        window.speechSynthesis.speak(msg);
+        </script>
+    """, height=0)
 
 # --- 3. SESSION INITIALIZATION ---
 st.set_page_config(page_title="LENSCAST_OS", layout="wide")
@@ -88,11 +93,24 @@ if check_password(): # SECURITY GATE ACTIVE
         with boot_area.container():
             st.markdown("<style>.boot-container {display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center;}</style><div class='boot-container'>", unsafe_allow_html=True)
             if os.path.exists(LOGO_PATH): st.image(LOGO_PATH, width=350)
-            if os.path.exists(STARTUP_SOUND): subprocess.Popen(['afplay', STARTUP_SOUND])
+            
+            # --- UNIVERSAL SOUND FIX ---
+            if os.path.exists(STARTUP_SOUND):
+                with open(STARTUP_SOUND, "rb") as f:
+                    data = f.read()
+                    b64 = base64.b64encode(data).decode()
+                    md = f"""
+                        <audio autoplay>
+                        <source src="data:audio/wav;base64,{b64}" type="audio/wav">
+                        </audio>
+                        """
+                    st.markdown(md, unsafe_allow_html=True)
+            
             st.markdown("<h2 style='color:#00f2ff; font-family: monospace;'>INITIALIZING LENSCAST_PROTOCOL...</h2>", unsafe_allow_html=True)
             bar = st.progress(0)
             for i in range(101):
                 time.sleep(0.01); bar.progress(i)
+            
             lizzy_speak(f"Welcome back, {st.session_state.memory['director_name']}. Systems secured.")
             st.session_state.booted = True; st.rerun()
 
