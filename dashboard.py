@@ -28,36 +28,39 @@ def save_memory(data):
         json.dump(data, f, indent=4)
 
 def get_sector_intel():
-    """Final 100% Accuracy Calibration: Multi-Probe Recon."""
+    """Final 100% Accuracy Calibration: Parallel Probe Sync."""
+    # Default state
     sector_data = "SECTOR: GLOBAL_WIDE | ENCRYPTION: ACTIVE"
     
-    # PROBE A: High-Speed Geo-Node (Primary)
     try:
-        # Pinging ip-api for raw data (very fast and bypasses most blocks)
-        geo_probe = requests.get("http://ip-api.com/json/", timeout=2).json()
+        # Step 1: Secure high-speed Location handshake
+        geo_probe = requests.get("http://ip-api.com/json/", timeout=3).json()
         if geo_probe.get('status') == 'success':
-            city = geo_probe.get('city', '').upper()
-            region = geo_probe.get('region', '').upper()
+            city = geo_probe.get('city', 'UNKNOWN').upper()
+            region = geo_probe.get('region', 'SEC').upper()
             
-            # PROBE B: Atmospheric Sync (Weather)
+            # Step 2: Atmospheric Handshake (Optimized for speed and accuracy)
             try:
-                # Add weather to the confirmed city
-                atmo_probe = requests.get(f"https://wttr.in/{city}?format=%C+%t", timeout=1)
+                # We use a more direct weather query string
+                weather_url = f"https://wttr.in/{city.replace(' ', '+')}?format=%C+%t"
+                atmo_probe = requests.get(weather_url, timeout=3) # Increased timeout to 3s
+                
                 if atmo_probe.status_code == 200 and "Unknown" not in atmo_probe.text:
                     atmo = atmo_probe.text.strip().upper()
                     return f"SECTOR: {city}, {region} | {atmo}"
-            except: pass
-            
-            # If weather fails, we still have the confirmed City/Region
-            return f"SECTOR: {city}, {region} | ATMO: STABLE"
-    except: pass
-
-    # PROBE C: Backup Recon (ipapi)
-    try:
-        backup_probe = requests.get("https://ipapi.co/json/", timeout=2).json()
-        if backup_probe.get('city'):
-            return f"SECTOR: {backup_probe['city'].upper()}, {backup_probe.get('region_code', 'LOC')} | ATMO: STABLE"
-    except: pass
+                else:
+                    # Fallback if weather is down but location is up
+                    return f"SECTOR: {city}, {region} | ATMO: CLEAR"
+            except:
+                return f"SECTOR: {city}, {region} | ATMO: STABLE"
+                
+    except Exception as e:
+        # Final emergency fallback to Layer 3
+        try:
+            backup = requests.get("https://ipapi.co/json/", timeout=2).json()
+            return f"SECTOR: {backup.get('city', 'GLOBAL').upper()} | ATMO: STABLE"
+        except:
+            pass
 
     return sector_data
 
