@@ -10,7 +10,7 @@ import hmac
 from datetime import datetime
 import streamlit.components.v1 as components
 
-# --- 1. CORE ENGINES & TRI-LAYER RECON ---
+# --- 1. CORE ENGINES & RECON ---
 MEMORY_FILE = "neural_vault.json"
 
 def load_memory():
@@ -64,17 +64,16 @@ def check_password():
         return False
     return True
 
-# --- 2. ASSET CONSTANTS ---
+# --- 2. ASSETS ---
 LOGO_PATH = "lenscast_logo.png"
 APP_ICON = "app_icon.png"
 STARTUP_SOUND = "startup.wav"
 
 def lizzy_speak(text):
-    """Voice module with a tactical delay to prevent browser interruption."""
     clean_text = re.sub(r"as an ai.*?,|I am an ai.*?,", "", text, flags=re.IGNORECASE).replace("'", "").replace('"', '')
     components.html(f"""
         <script>
-        window.speechSynthesis.cancel(); // Clear queue
+        window.speechSynthesis.cancel();
         var msg = new SpeechSynthesisUtterance('{clean_text}');
         msg.rate = 1.0; msg.pitch = 0.8;
         window.speechSynthesis.speak(msg);
@@ -88,22 +87,29 @@ if check_password():
     if 'booted' not in st.session_state:
         st.session_state.update({
             'booted': False, 'messages': [], 'memory': load_memory(),
-            'sector_intel': get_sector_intel(), 'last_speech': ""
+            'sector_intel': get_sector_intel()
         })
 
-    # --- 4. IDENTITY VERIFICATION SCREEN ---
+    # --- 4. THE BOOT SEQUENCE ---
     if not st.session_state.booted:
         boot_area = st.empty()
         with boot_area.container():
-            st.markdown("<style>.boot-wrapper{display:flex; flex-direction:column; align-items:center; justify-content:center; height:80vh; text-align:center;}</style><div class='boot-wrapper'>", unsafe_allow_html=True)
+            # Enhanced CSS for dead-centering
+            st.markdown("""
+                <style>
+                .boot-wrapper {
+                    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    background-color: #050505; z-index: 9999;
+                }
+                </style>
+                <div class='boot-wrapper'>
+            """, unsafe_allow_html=True)
             
-            # Forced logo render using path validation
             if os.path.exists(LOGO_PATH):
-                st.image(LOGO_PATH, width=400)
-            else:
-                st.markdown("<h1 style='color: #00f2ff;'>[ LENSCAST ]</h1>", unsafe_allow_html=True)
-
-            st.markdown(f"<div style='border: 2px solid #00f2ff; padding: 20px; background: rgba(0, 242, 255, 0.05); border-radius: 10px; width: 300px;'><h2 style='color:#00f2ff; font-family: monospace; margin:0;'>IDENTITY VERIFIED</h2><hr style='border: 0.5px solid #00f2ff; opacity: 0.3;'><p style='color:#fff; font-family: monospace;'>{st.session_state.memory['director_name'].upper()}</p></div>", unsafe_allow_html=True)
+                st.image(LOGO_PATH, width=350)
+            
+            st.markdown(f"<div style='border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.1); border-radius: 5px; margin-top: 20px;'><h3 style='color:#00f2ff; font-family: monospace; margin:0;'>IDENTITY VERIFIED: {st.session_state.memory['director_name'].upper()}</h3></div>", unsafe_allow_html=True)
 
             if os.path.exists(STARTUP_SOUND):
                 with open(STARTUP_SOUND, "rb") as f:
@@ -111,36 +117,55 @@ if check_password():
                     st.markdown(f'<audio autoplay><source src="data:audio/wav;base64,{b64}"></audio>', unsafe_allow_html=True)
             
             time.sleep(2.5) 
-            lizzy_speak(f"Welcome back, {st.session_state.memory['director_name']}. All systems online.")
+            lizzy_speak(f"Systems online. Welcome back, {st.session_state.memory['director_name']}.")
             time.sleep(4.0) 
-            st.session_state.booted = True; st.rerun()
-
-    # --- 5. MAIN DASHBOARD ---
-    st.markdown(f"""
-        <div style="background: #0a0a0a; border-bottom: 2px solid #00f2ff; padding: 10px; display: flex; justify-content: space-between; font-family: monospace;">
-            <span style="color: #00f2ff;">📡 LINK: SECURE</span>
-            <span style="color: #00f2ff;">🛰️ {st.session_state.sector_intel}</span>
-            <span style="color: #00f2ff;">👤 {st.session_state.memory['director_name'].upper()}</span>
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<style>.stApp {background-color:#050505; color:#00f2ff;} [data-baseweb='tab'] {color:#00f2ff !important; font-family:monospace;}</style>", unsafe_allow_html=True)
-    tabs = st.tabs(["👁️ LENSCAST", "💾 VAULT", "📋 LOGS", "💬 COMM_LINK"])
-
-    with tabs[3]: # COMM_LINK
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]): st.write(msg['content'])
-        
-        u_in = st.chat_input("Manual Transmission...")
-        if u_in:
-            st.session_state.messages.append({"role": "user", "content": u_in})
-            client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-            context = f"You are Lizzy, the Control Unit for LENSCAST. Director: {st.session_state.memory['director_name']}. Sector: {st.session_state.sector_intel}."
-            completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": context}] + st.session_state.messages[-5:])
-            ans = completion.choices[0].message.content
-            st.session_state.messages.append({"role": "assistant", "content": ans})
             
-            # The Speech Logic: We trigger speech then wait a split second before the rerun
-            lizzy_speak(ans)
-            time.sleep(0.5) 
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.session_state.booted = True
             st.rerun()
+
+    # --- 5. THE MAIN INTERFACE ---
+    # This section is now protected so it only renders AFTER boot
+    if st.session_state.booted:
+        st.markdown(f"""
+            <div style="background: #0a0a0a; border-bottom: 2px solid #00f2ff; padding: 10px; display: flex; justify-content: space-between; font-family: monospace;">
+                <span style="color: #00f2ff;">📡 LINK: SECURE</span>
+                <span style="color: #00f2ff;">🛰️ {st.session_state.sector_intel}</span>
+                <span style="color: #00f2ff;">👤 {st.session_state.memory['director_name'].upper()}</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<style>.stApp {background-color:#050505; color:#00f2ff;} [data-baseweb='tab'] {color:#00f2ff !important; font-family:monospace;}</style>", unsafe_allow_html=True)
+        
+        tabs = st.tabs(["👁️ LENSCAST", "💾 VAULT", "📋 LOGS", "💬 COMM_LINK"])
+
+        with tabs[0]:
+            st.markdown("### 👁️ OPTIC_SURVEILLANCE")
+            st.camera_input("SENSORS_ACTIVE")
+
+        with tabs[1]:
+            st.markdown("### 💾 NEURAL_VAULT")
+            new_name = st.text_input("Director Designation:", value=st.session_state.memory['director_name'])
+            if st.button("UPDATE"):
+                st.session_state.memory['director_name'] = new_name
+                save_memory(st.session_state.memory); st.rerun()
+
+        with tabs[2]:
+            st.markdown("### 📋 FACILITY_LOGS")
+            for log in st.session_state.memory.get('boot_logs', []):
+                st.code(f"[{log['timestamp']}] >> {log['status']}")
+
+        with tabs[3]:
+            for msg in st.session_state.messages:
+                with st.chat_message(msg["role"]): st.write(msg['content'])
+            u_in = st.chat_input("Manual Transmission...")
+            if u_in:
+                st.session_state.messages.append({"role": "user", "content": u_in})
+                client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                context = f"You are Lizzy. Director: {st.session_state.memory['director_name']}. Sector: {st.session_state.sector_intel}."
+                completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": context}] + st.session_state.messages[-5:])
+                ans = completion.choices[0].message.content
+                st.session_state.messages.append({"role": "assistant", "content": ans})
+                lizzy_speak(ans)
+                time.sleep(0.5)
+                st.rerun()
