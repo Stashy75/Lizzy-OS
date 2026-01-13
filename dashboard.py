@@ -62,9 +62,14 @@ STARTUP_SOUND = "startup.wav"
 def trigger_haptic():
     components.html("<script>window.navigator.vibrate([100, 30, 100]);</script>", height=0)
 
-def lizzy_speak(text):
+ddef lizzy_speak(text):
     """Universal Voice: Commands the browser (Phone or PC) to speak."""
-    clean_text = re.sub(r"(?i)as an ai.*?,|(?i)I am an ai.*?,", "", text)
+    # Simplified fix for the Regex error:
+    # We remove the (?i) from the string and use flags=re.IGNORECASE instead
+    pattern = r"as an ai.*?,|I am an ai.*?,|legal guidelines"
+    clean_text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    
+    # Clean up quotes and newlines for JavaScript
     clean_text = clean_text.replace("'", "").replace('"', '').replace("\n", " ")
     
     components.html(f"""
