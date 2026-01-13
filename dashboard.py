@@ -2,11 +2,8 @@ import streamlit as st
 from groq import Groq
 import os
 import time
-import subprocess
-import cv2
-import numpy as np
+import requests
 import re
-import speech_recognition as sr
 import base64
 import json
 import hmac
@@ -28,8 +25,17 @@ def save_memory(data):
     with open(MEMORY_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+def get_sector_weather():
+    """Live recon of local atmospheric conditions."""
+    try:
+        res = requests.get("https://wttr.in/?format=%C+%t", timeout=5)
+        if res.status_code == 200:
+            return f"SECTOR ATMO: {res.text.strip()}"
+    except:
+        pass
+    return "SECTOR ATMO: SENSORS OFFLINE"
+
 def check_password():
-    """Director Override with Lockdown Logic."""
     if "attempts" not in st.session_state: st.session_state.attempts = 0
     if "lockout" not in st.session_state: st.session_state.lockout = False
 
@@ -49,12 +55,12 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if st.session_state.lockout:
-        st.markdown("<style>.stApp{background:#2e0000;}</style>", unsafe_allow_html=True)
+        st.markdown("<style>.stApp {background:#2e0000;}</style>", unsafe_allow_html=True)
         st.error("🚨 SYSTEM LOCKDOWN: UNAUTHORIZED ACCESS DETECTED. FACILITY SEALED.")
         st.stop()
 
     if "password_correct" not in st.session_state:
-        st.markdown("<style>.stApp{background:#050505;}</style>", unsafe_allow_html=True)
+        st.markdown("<style>.stApp {background:#050505;}</style>", unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center; color: #00f2ff; margin-top: 15%; font-family: monospace;'>LENSCAST_OS</h1>", unsafe_allow_html=True)
         st.text_input(f"ENTER OVERRIDE CODE (ATTEMPT {st.session_state.attempts + 1}/3)", type="password", on_change=password_entered, key="password")
         if st.session_state.attempts > 0:
@@ -64,6 +70,7 @@ def check_password():
 
 # --- 2. ASSETS & ENGINES ---
 LOGO_PATH = "lenscast_logo.png"
+APP_ICON = "app_icon.png"
 STARTUP_SOUND = "startup.wav"
 
 def lizzy_speak(text):
@@ -73,13 +80,13 @@ def lizzy_speak(text):
     components.html(f"<script>var msg = new SpeechSynthesisUtterance('{clean_text}'); msg.rate = 1.1; msg.pitch = 0.9; window.speechSynthesis.speak(msg);</script>", height=0)
 
 # --- 3. INITIALIZATION ---
-st.set_page_config(page_title="LENSCAST_OS", layout="wide")
+st.set_page_config(page_title="LENSCAST_OS", page_icon=APP_ICON, layout="wide")
 
 if check_password(): 
     if 'booted' not in st.session_state:
         st.session_state.update({
             'booted': False, 'messages': [], 'memory': load_memory(),
-            'sector_intel': "ATMOSPHERE: 22°C | STABLE"
+            'sector_intel': get_sector_weather()
         })
 
     # --- 4. TACTICAL STATUS HEADER ---
@@ -91,28 +98,50 @@ if check_password():
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 5. CENTERED BOOT ---
+    # --- 5. CENTERED BOOT SEQUENCE ---
     if not st.session_state.booted:
         boot_area = st.empty()
         with boot_area.container():
-            st.markdown("<style>.boot-container {display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh; text-align: center;}</style><div class='boot-container'>", unsafe_allow_html=True)
-            if os.path.exists(LOGO_PATH): st.image(LOGO_PATH, width=350)
+            st.markdown("""
+                <style>
+                .boot-wrapper {
+                    display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center;
+                }
+                .stProgress > div > div > div > div { background-color: #00f2ff; }
+                </style>
+                <div class="boot-wrapper">
+            """, unsafe_allow_html=True)
+            
+            if os.path.exists(LOGO_PATH): 
+                st.image(LOGO_PATH, width=350)
             
             if os.path.exists(STARTUP_SOUND):
                 with open(STARTUP_SOUND, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode()
                     st.markdown(f'<audio autoplay><source src="data:audio/wav;base64,{b64}"></audio>', unsafe_allow_html=True)
             
-            st.markdown("<h2 style='color:#00f2ff; font-family: monospace;'>INITIALIZING LENSCAST_PROTOCOL...</h2>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#00f2ff; font-family: monospace; letter-spacing: 2px;'>ESTABLISHING NEURAL LINK...</h4>", unsafe_allow_html=True)
+            
+            # Slowing down the progress bar slightly for visual impact
             bar = st.progress(0)
             for i in range(101):
-                time.sleep(0.01); bar.progress(i)
+                time.sleep(0.02) # Slightly slower for cinematic effect
+                bar.progress(i)
             
-            lizzy_speak(f"Welcome back, {st.session_state.memory['director_name']}. All systems online. Atmospheric conditions in your sector are stable.")
-            st.session_state.booted = True; st.rerun()
+            # Greet while the logo is still visible
+            atmo = st.session_state.sector_intel.replace('SECTOR ATMO: ', '')
+            lizzy_speak(f"Welcome back, {st.session_state.memory['director_name']}. Systems secured. Sector conditions are {atmo}.")
+            
+            # Small pause so the user can see 100% completion
+            time.sleep(1.2)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.session_state.booted = True
+            st.rerun()
 
     # --- 6. MAIN INTERFACE ---
-    st.markdown("<style>.stApp{background-color:#050505; color:#00f2ff;} [data-baseweb='tab']{color:#00f2ff !important; font-family:monospace;}</style>", unsafe_allow_html=True)
+    st.markdown("<style>.stApp {background-color:#050505; color:#00f2ff;} [data-baseweb='tab'] {color:#00f2ff !important; font-family:monospace;}</style>", unsafe_allow_html=True)
     
     tabs = st.tabs(["👁️ LENSCAST", "💾 VAULT", "📋 LOGS", "💬 COMM_LINK"])
 
@@ -131,12 +160,11 @@ if check_password():
                 st.session_state.memory['director_name'] = new_name
                 save_memory(st.session_state.memory)
                 st.success("VAULT UPDATED")
-        
         with col2:
             st.markdown("### 📂 INTEL_DROPZONE")
             intel_file = st.file_uploader("Upload Tactical Files", type=['pdf', 'txt', 'png', 'jpg'])
             if intel_file:
-                st.info(f"FILE {intel_file.name} ENCRYPTED AND STORED IN VAULT.")
+                st.info(f"FILE {intel_file.name} ENCRYPTED AND STORED.")
 
     with tabs[2]: # AUDIT LOGS
         st.markdown("### 📋 FACILITY_LOGS")
@@ -146,12 +174,11 @@ if check_password():
     with tabs[3]: # COMM_LINK
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]): st.write(msg['content'])
-        
         u_in = st.chat_input("Manual Transmission...")
         if u_in:
             st.session_state.messages.append({"role": "user", "content": u_in})
             client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-            context = f"You are Lizzy, a LENSCAST Tactical AI. Director: {st.session_state.memory['director_name']}. Be sentient, tactical, and loyal."
+            context = f"You are Lizzy, a LENSCAST Tactical AI. Director: {st.session_state.memory['director_name']}. Current Weather: {st.session_state.sector_intel}. Be sentient, tactical, and loyal."
             completion = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": context}] + st.session_state.messages[-5:])
             ans = completion.choices[0].message.content
             st.session_state.messages.append({"role": "assistant", "content": ans})
