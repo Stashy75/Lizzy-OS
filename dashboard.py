@@ -33,7 +33,6 @@ def save_memory(data):
 def check_password():
     """Director Override Gate using Code 3431."""
     def password_entered():
-        # Hardcoded Secure comparison
         if hmac.compare_digest(st.session_state["password"], "3431"):
             st.session_state["password_correct"] = True
             mem = load_memory()
@@ -62,14 +61,10 @@ STARTUP_SOUND = "startup.wav"
 def trigger_haptic():
     components.html("<script>window.navigator.vibrate([100, 30, 100]);</script>", height=0)
 
-ddef lizzy_speak(text):
+def lizzy_speak(text):
     """Universal Voice: Commands the browser (Phone or PC) to speak."""
-    # Simplified fix for the Regex error:
-    # We remove the (?i) from the string and use flags=re.IGNORECASE instead
     pattern = r"as an ai.*?,|I am an ai.*?,|legal guidelines"
     clean_text = re.sub(pattern, "", text, flags=re.IGNORECASE)
-    
-    # Clean up quotes and newlines for JavaScript
     clean_text = clean_text.replace("'", "").replace('"', '').replace("\n", " ")
     
     components.html(f"""
@@ -84,7 +79,7 @@ ddef lizzy_speak(text):
 # --- 3. SESSION INITIALIZATION ---
 st.set_page_config(page_title="LENSCAST_OS", layout="wide")
 
-if check_password(): # SECURITY GATE ACTIVE
+if check_password(): 
     if 'booted' not in st.session_state:
         st.session_state.update({
             'booted': False, 'sensors_active': False, 'flashlight': False,
@@ -99,7 +94,6 @@ if check_password(): # SECURITY GATE ACTIVE
             st.markdown("<style>.boot-container {display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center;}</style><div class='boot-container'>", unsafe_allow_html=True)
             if os.path.exists(LOGO_PATH): st.image(LOGO_PATH, width=350)
             
-            # --- UNIVERSAL SOUND FIX ---
             if os.path.exists(STARTUP_SOUND):
                 with open(STARTUP_SOUND, "rb") as f:
                     data = f.read()
@@ -117,7 +111,8 @@ if check_password(): # SECURITY GATE ACTIVE
                 time.sleep(0.01); bar.progress(i)
             
             lizzy_speak(f"Welcome back, {st.session_state.memory['director_name']}. Systems secured.")
-            st.session_state.booted = True; st.rerun()
+            st.session_state.booted = True
+            st.rerun()
 
     # --- 5. MAIN INTERFACE ---
     st.markdown("<style>.stApp{background-color:#050505; color:#00f2ff;} [data-baseweb='tab']{color:#00f2ff !important; font-family:monospace;}</style>", unsafe_allow_html=True)
