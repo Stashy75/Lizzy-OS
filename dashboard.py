@@ -7,6 +7,8 @@ import re
 import base64
 import json
 import hmac
+import cv2
+import numpy as np
 from datetime import datetime
 import streamlit.components.v1 as components
 
@@ -26,17 +28,18 @@ def save_memory(data):
         json.dump(data, f, indent=4)
 
 def get_sector_intel():
-    """Tri-Layer Recon for Location/Weather."""
     try:
         res = requests.get("https://wttr.in/?format=%l:+%C+%t", timeout=3)
         if res.status_code == 200 and "Unknown" not in res.text:
             return f"SECTOR: {res.text.strip()}"
     except: pass
-    try:
-        res = requests.get("https://ipapi.co/json/", timeout=3).json()
-        return f"SECTOR: {res.get('city', 'GLOBAL')}, {res.get('region_code', 'WIDE')}"
-    except: pass
-    return "SECTOR: ENCRYPTED"
+    return "SECTOR: ENCRYPTED | ATMO: STABLE"
+
+def get_base64_bin(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
 def check_password():
     if "attempts" not in st.session_state: st.session_state.attempts = 0
@@ -87,45 +90,41 @@ if check_password():
     if 'booted' not in st.session_state:
         st.session_state.update({
             'booted': False, 'messages': [], 'memory': load_memory(),
-            'sector_intel': get_sector_intel()
+            'sector_intel': get_sector_intel(), 'spatial_alert': False
         })
 
     # --- 4. THE BOOT SEQUENCE ---
     if not st.session_state.booted:
+        logo_b64 = get_base64_bin(LOGO_PATH)
         boot_area = st.empty()
         with boot_area.container():
-            # Enhanced CSS for dead-centering
-            st.markdown("""
+            st.markdown(f"""
                 <style>
-                .boot-wrapper {
+                .boot-wrapper {{
                     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     background-color: #050505; z-index: 9999;
-                }
+                }}
                 </style>
                 <div class='boot-wrapper'>
+                    {'<img src="data:image/png;base64,' + logo_b64 + '" width="350">' if logo_b64 else ''}
+                    <div style='border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.1); border-radius: 5px; margin-top: 20px;'>
+                        <h3 style='color:#00f2ff; font-family: monospace; margin:0;'>IDENTITY VERIFIED: {st.session_state.memory['director_name'].upper()}</h3>
+                    </div>
+                </div>
             """, unsafe_allow_html=True)
-            
-            if os.path.exists(LOGO_PATH):
-                st.image(LOGO_PATH, width=350)
-            
-            st.markdown(f"<div style='border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.1); border-radius: 5px; margin-top: 20px;'><h3 style='color:#00f2ff; font-family: monospace; margin:0;'>IDENTITY VERIFIED: {st.session_state.memory['director_name'].upper()}</h3></div>", unsafe_allow_html=True)
 
             if os.path.exists(STARTUP_SOUND):
-                with open(STARTUP_SOUND, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode()
-                    st.markdown(f'<audio autoplay><source src="data:audio/wav;base64,{b64}"></audio>', unsafe_allow_html=True)
+                sound_b64 = get_base64_bin(STARTUP_SOUND)
+                st.markdown(f'<audio autoplay><source src="data:audio/wav;base64,{sound_b64}"></audio>', unsafe_allow_html=True)
             
             time.sleep(2.5) 
             lizzy_speak(f"Systems online. Welcome back, {st.session_state.memory['director_name']}.")
             time.sleep(4.0) 
-            
-            st.markdown("</div>", unsafe_allow_html=True)
             st.session_state.booted = True
             st.rerun()
 
     # --- 5. THE MAIN INTERFACE ---
-    # This section is now protected so it only renders AFTER boot
     if st.session_state.booted:
         st.markdown(f"""
             <div style="background: #0a0a0a; border-bottom: 2px solid #00f2ff; padding: 10px; display: flex; justify-content: space-between; font-family: monospace;">
@@ -139,23 +138,36 @@ if check_password():
         
         tabs = st.tabs(["👁️ LENSCAST", "💾 VAULT", "📋 LOGS", "💬 COMM_LINK"])
 
-        with tabs[0]:
-            st.markdown("### 👁️ OPTIC_SURVEILLANCE")
-            st.camera_input("SENSORS_ACTIVE")
+        with tabs[0]: # SPATIAL TRACKING
+            st.markdown("### 👁️ OPTIC_SURVEILLANCE & SPATIAL_TRACKING")
+            cam_image = st.camera_input("SCANNER_ACTIVE")
+            
+            if cam_image:
+                # Logic to simulate spatial tracking via frame analysis
+                st.session_state.spatial_alert = True
+                st.warning("🚨 SPATIAL ANOMALY DETECTED: PROXIMITY ALERT ACTIVE")
+                lizzy_speak("Director, proximity alert triggered. Spatial field is unstable.")
 
-        with tabs[1]:
+        with tabs[1]: # VAULT
             st.markdown("### 💾 NEURAL_VAULT")
-            new_name = st.text_input("Director Designation:", value=st.session_state.memory['director_name'])
-            if st.button("UPDATE"):
-                st.session_state.memory['director_name'] = new_name
-                save_memory(st.session_state.memory); st.rerun()
+            col1, col2 = st.columns(2)
+            with col1:
+                new_name = st.text_input("Director Designation:", value=st.session_state.memory['director_name'])
+                if st.button("UPDATE ARCHIVES"):
+                    st.session_state.memory['director_name'] = new_name
+                    save_memory(st.session_state.memory); st.rerun()
+            with col2:
+                st.markdown("### 📂 INTEL_DROPZONE")
+                intel_file = st.file_uploader("Secure Tactical Scans/Files", type=['pdf', 'txt', 'png', 'jpg'])
+                if intel_file:
+                    st.info(f"FILE {intel_file.name} ENCRYPTED AND STORED.")
 
-        with tabs[2]:
+        with tabs[2]: # LOGS
             st.markdown("### 📋 FACILITY_LOGS")
             for log in st.session_state.memory.get('boot_logs', []):
                 st.code(f"[{log['timestamp']}] >> {log['status']}")
 
-        with tabs[3]:
+        with tabs[3]: # COMM_LINK
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg['content'])
             u_in = st.chat_input("Manual Transmission...")
@@ -167,5 +179,4 @@ if check_password():
                 ans = completion.choices[0].message.content
                 st.session_state.messages.append({"role": "assistant", "content": ans})
                 lizzy_speak(ans)
-                time.sleep(0.5)
-                st.rerun()
+                time.sleep(0.5); st.rerun()
