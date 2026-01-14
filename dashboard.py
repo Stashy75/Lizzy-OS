@@ -11,9 +11,8 @@ import cv2
 import numpy as np
 from datetime import datetime
 import streamlit.components.v1 as components
-from PIL import Image
 
-# --- 1. CORE ENGINES ---
+# --- 1. CORE ENGINES & COGNITIVE MEMORY ---
 MEMORY_FILE = "neural_vault.json"
 
 def load_memory():
@@ -50,6 +49,9 @@ def check_password():
         pwd = st.text_input("ENTER OVERRIDE", type="password", key="main_login")
         if pwd == "3431":
             st.session_state.password_correct = True
+            mem = load_memory()
+            mem["boot_logs"].insert(0, {"timestamp": datetime.now().strftime("%H:%M:%S"), "status": "AUTHORIZED"})
+            save_memory(mem)
             st.rerun()
         return False
     return True
@@ -74,42 +76,37 @@ st.set_page_config(page_title="LENSCAST_OS", page_icon=APP_ICON, layout="wide")
 
 if check_password():
     if 'booted' not in st.session_state:
-        st.session_state.update({'booted': False, 'messages': [], 'memory': load_memory(), 'sector_intel': get_sector_intel()})
+        st.session_state.update({
+            'booted': False, 
+            'messages': [], 
+            'memory': load_memory(), 
+            'sector_intel': get_sector_intel()
+        })
 
-    # --- 4. CINEMATIC BOOT SEQUENCE ---
+    # --- 4. CINEMATIC BOOT ---
     if not st.session_state.booted:
         logo_b64 = get_base64_bin(LOGO_PATH)
         boot_area = st.empty()
         with boot_area.container():
             st.markdown(f"""
                 <style>
-                @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+                @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
                 .boot-wrapper {{
                     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     background-color: #050505; z-index: 9999;
                 }}
-                .id-box {{
-                    border: 1px solid #00f2ff; padding: 25px; background: rgba(0, 242, 255, 0.05); 
-                    border-radius: 8px; margin-top: 30px; animation: fadeIn 1.5s ease-out;
-                }}
+                .id-box {{ border: 1px solid #00f2ff; padding: 25px; background: rgba(0, 242, 255, 0.05); animation: fadeIn 2s; }}
                 </style>
                 <div class='boot-wrapper'>
                     {'<img src="data:image/png;base64,' + logo_b64 + '" width="320">' if logo_b64 else ''}
-                    <div class='id-box'>
-                        <h3 style='color:#00f2ff; font-family: monospace; margin:0;'>IDENTITY VERIFIED</h3>
-                        <p style='color:#fff; font-family: monospace; margin-top:10px; opacity:0.8;'>ACCESS GRANTED: {st.session_state.memory['director_name'].upper()}</p>
-                    </div>
+                    <div class='id-box'><h3 style='color:#00f2ff; font-family: monospace;'>IDENTITY VERIFIED</h3></div>
                 </div>
             """, unsafe_allow_html=True)
-
             if os.path.exists(STARTUP_SOUND):
                 s_b64 = get_base64_bin(STARTUP_SOUND)
                 st.markdown(f'<audio autoplay><source src="data:audio/wav;base64,{s_b64}"></audio>', unsafe_allow_html=True)
-            
-            time.sleep(2.5) 
-            lizzy_speak(f"Neural link established. Welcome, {st.session_state.memory['director_name']}.")
-            time.sleep(4.0) 
+            time.sleep(2.5); lizzy_speak(f"Neural link established. Welcome back, {st.session_state.memory['director_name']}."); time.sleep(4.0)
             st.session_state.booted = True; st.rerun()
 
     # --- 5. DASHBOARD ---
@@ -117,45 +114,54 @@ if check_password():
     
     tabs = st.tabs(["👁️ LENSCAST", "💾 VAULT", "📋 LOGS", "💬 COMM_LINK"])
 
-    with tabs[0]:
-        st.markdown("### 👁️ OPTIC_SURVEILLANCE & SPATIAL_ANALYSIS")
+    with tabs[0]: # OPTIC SURVEILLANCE (REFINED)
+        st.markdown("### 👁️ OPTIC_SURVEILLANCE")
         cam_image = st.camera_input("SCANNER_ACTIVE")
-        
         if cam_image:
             file_bytes = np.asarray(bytearray(cam_image.read()), dtype=np.uint8)
             opencv_image = cv2.imdecode(file_bytes, 1)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-            
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
             faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
             if len(faces) > 0:
-                for i, (x, y, w, h) in enumerate(faces):
-                    dist = int(5000 / w) 
-                    st.success(f"🎯 TARGET {i+1} DETECTED | ESTIMATED RANGE: {dist} CM")
-                    
-                    # FIX: Added unique key to prevent DuplicateElementId error
-                    if st.button(f"RUN RECOGNITION PROTOCOL", key=f"recog_{i}_{x}"):
-                        st.info("🔎 ANALYZING BIOMETRICS...")
-                        time.sleep(1.5)
-                        st.write(f"✅ IDENTITY CONFIRMED: {st.session_state.memory['director_name'].upper()}")
-                        lizzy_speak(f"Director recognized. Range verified at {dist} centimeters. Spatial field stabilized.")
+                # Target Lock logic: Only process the first (most prominent) target
+                x, y, w, h = faces[0] 
+                dist = int(5000 / w) 
+                st.success(f"🎯 TARGET LOCKED | RANGE: {dist} CM")
+                
+                if st.button("RUN BIOMETRIC RECOGNITION", key="biorecog"):
+                    st.info("🔎 ANALYZING...")
+                    time.sleep(1.0)
+                    st.write(f"✅ CONFIRMED: {st.session_state.memory['director_name'].upper()}")
+                    lizzy_speak(f"Identity confirmed. Target recognized as the Director at {dist} centimeters.")
             else:
-                st.error("⚠️ NO TARGET IN FIELD OF VIEW")
-                lizzy_speak("Scanning spatial field. No biological signatures detected.")
+                st.error("⚠️ NO SIGNATURES DETECTED")
 
-    with tabs[1]:
-        st.markdown("### 💾 NEURAL_VAULT")
-        intel_file = st.file_uploader("DROP INTEL HERE", type=['pdf', 'png', 'jpg'], key="vault_upload")
-        if intel_file: st.info(f"FILE {intel_file.name} ENCRYPTED.")
+    with tabs[2]: # LOGS (FIXED)
+        st.markdown("### 📋 FACILITY_LOGS")
+        for log in st.session_state.memory.get('boot_logs', []):
+            st.markdown(f"<div style='border-left: 2px solid #00f2ff; padding-left: 10px; margin-bottom: 5px; color: #fff; font-family: monospace;'>[{log['timestamp']}] >> {log['status']}</div>", unsafe_allow_html=True)
 
-    with tabs[3]:
+    with tabs[3]: # COMM_LINK (PERSONABLE MEMORY)
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]): st.write(msg['content'])
-        u_in = st.chat_input("Manual Transmission...", key="chat_input")
+        u_in = st.chat_input("Direct Transmission...")
         if u_in:
             st.session_state.messages.append({"role": "user", "content": u_in})
             client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-            ans = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": "You are Lizzy."}] + st.session_state.messages[-5:]).choices[0].message.content
+            
+            # Persona and Memory Integration
+            persona = f"""You are Lizzy, a tactical and slightly witty AI assistant for LENSCAST. 
+            Director's Name: {st.session_state.memory['director_name']}. 
+            Recent Events: {st.session_state.memory['boot_logs'][:3]}.
+            Always be personable, concise, and refer to the Director by name when appropriate. 
+            You remember past logs and previous chat history."""
+            
+            ans = client.chat.completions.create(
+                model="llama-3.3-70b-versatile", 
+                messages=[{"role": "system", "content": persona}] + st.session_state.messages[-10:]
+            ).choices[0].message.content
+            
             st.session_state.messages.append({"role": "assistant", "content": ans})
             lizzy_speak(ans); time.sleep(0.5); st.rerun()
